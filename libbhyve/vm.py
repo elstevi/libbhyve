@@ -1,6 +1,6 @@
 from config import *
 from disk import Disk
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, PackageLoader
 from nic import Nic
 from os.path import isfile
 from time import sleep
@@ -99,7 +99,7 @@ class VM:
     def insert_websockify_config(self):
         sleep(4) # Allow the socket to establish and pick a port
         FILE="/usr/local/etc/nginx/sockify.d/%s" % self.name
-        env = Environment(loader=FileSystemLoader('libbhyve/templates'))
+        env = Environment(loader=PackageLoader  ('libbhyve', 'templates'))
         template = env.get_template('nginx-sockify.conf')
         file_data = template.render(name=self.name, vnc_port=self.get_vnc_port())
         with open(FILE,"wb") as f:
