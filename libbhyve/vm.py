@@ -88,6 +88,7 @@ class VM:
         for key in vars(self):
             if key == 'disk' or key == 'network':
                 rtrn[key] = []
+                rtrn['vnc_port'] = self.get_vnc_port()
                 for item in vars(self)[key]:
                     rtrn[key].append(item.dump())
                     print 'dump %s' % item 
