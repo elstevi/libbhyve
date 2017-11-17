@@ -1,13 +1,13 @@
 from config import *
 from disk import Disk
+from jinja2 import Environment, FileSystemLoader
 from nic import Nic
 from os.path import isfile
 from time import sleep
-from utils import log, shell
+from utils import log, shell, nginx_reload
 import subprocess
 import json 
 import os
-
 
 class VM:
     def __init__(self, something):
@@ -96,6 +96,21 @@ class VM:
                 rtrn[key] = getattr(self, key)
         return rtrn
 
+    def insert_websockify_config(self):
+        sleep(4) # Allow the socket to establish and pick a port
+        FILE="/usr/local/etc/nginx/sockify.d/%s" % self.name
+        env = Environment(loader=FileSystemLoader('libbhyve/templates'))
+        template = env.get_template('nginx-sockify.conf')
+        file_data = template.render(name=self.name, vnc_port=self.get_vnc_port())
+        with open(FILE,"wb") as f:
+            f.write(file_data)
+        nginx_reload()
+
+    def remove_websockify_config(self):
+        FILE="/usr/local/etc/nginx/sockify.d/%s" % self.name
+        os.remove(FILE)
+        nginx_reload()
+
 
     def save(self):
         d = self.dump_to_dict()
@@ -145,8 +160,8 @@ class VM:
 
         bhyve_cmd = """/usr/sbin/bhyve -c %s -m %sM -A -H -w -s 0,hostbridge -s 31,lpc %s %s %s""" % (self.ncpus, self.memory, pcistr, lpcistr, self.name)
         screen_cmd = """/usr/local/bin/screen -dmS bhyve.%s sh -c '%s 2>&1 | tee /tmp/vm-%s'""" % (self.name, bhyve_cmd, self.name)
-        print screen_cmd
         p = subprocess.Popen(screen_cmd, shell=True)
+        self.insert_websockify_config()
 
     def get_pid(self):
         try:
@@ -194,6 +209,7 @@ class VM:
             network.stop()
         for disk in self.disk:
             disk.stop()
+        self.remove_websockify_config()
 
     def status(self):
         if self.get_pid() == 0:

@@ -8,3 +8,5 @@ def log(level, message):
     entry = '[%s] %s' % (level, message)
     print entry
     return entry
+def nginx_reload():
+    subprocess.check_output("/usr/sbin/service nginx reload", shell=True)
