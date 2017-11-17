@@ -15,7 +15,7 @@ class VM:
         self.bootrom = '/usr/local/share/uefi-firmware/BHYVE_UEFI.fd'
         self.com1 = 'stdio'
         self.disk = []
-        self.fbuf_ip = None
+        self.fbuf_ip = '0.0.0.0'
         self.fbuf_port = None
         self.fbuf_wait = False 
         self.iso = "" 
@@ -28,6 +28,8 @@ class VM:
             self.load_from_file('%s/%s' % (VM_DIR, something))
         elif isfile('%s' % (something)):
             self.load_from_file('%s' % (something))
+        elif something == None:
+            b = '' 
         else:
             raise OSError("VM %s does not exist" % something)
 

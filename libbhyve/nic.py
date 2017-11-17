@@ -16,8 +16,8 @@ class Nic():
             raise TypeError('Invalid mac addr %s' % mac)
 
         # Make sure that the bridge is valid
-        if type(bridge) is not str:
-            raise TypeError('Bridge should be a string')
+#        if type(bridge) is not str:
+#            raise TypeError('Bridge should be a string')
 
         if not bridge in check_output("ifconfig -g bridge", shell=True):
             raise TypeError('Bridge %s does not exist' % bridge)
