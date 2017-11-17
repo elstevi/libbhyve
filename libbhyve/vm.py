@@ -15,8 +15,6 @@ class VM:
         self.bootrom = '/usr/local/share/uefi-firmware/BHYVE_UEFI.fd'
         self.com1 = 'stdio'
         self.disk = []
-        self.fbuf_ip = '0.0.0.0'
-        self.fbuf_port = None
         self.fbuf_wait = False 
         self.iso = "" 
         self.memory = 1024 
@@ -130,14 +128,12 @@ class VM:
             pcistr += '-s %s,ahci-cd,%s' % (i, self.iso)
             i = i + 1
 
-        if self.fbuf_ip != None and self.fbuf_port != None:
-#            if self.fbuf_wait == True:
-#                fbw = ',wait'
-#            else:
-#                fbw = ''
+        if self.fbuf_wait == True:
+            fbw = ',wait'
+        else:
             fbw = ''
-            pcistr += ' -s %s,fbuf,tcp=%s:%s%s' % (i, self.fbuf_ip, self.fbuf_port, fbw)
-            i = i + 1
+        pcistr += ' -s %s,fbuf,tcp=127.0.0.1:0%s' % (i, fbw)
+        i = i + 1
 
         # PCI Bridge devices
         if self.com1 is not 'None':
@@ -151,11 +147,6 @@ class VM:
         print screen_cmd
         p = subprocess.Popen(screen_cmd, shell=True)
 
-        socket_cmd = """/usr/local/libexec/novnc/utils/websockify/nr 0.0.0.0:%s 127.0.0.1:%s""" % ('10' + str(self.fbuf_port)[1:], self.fbuf_port)
-        socket_cmd_screen = """/usr/local/bin/screen -dmS bhyve-websockify.%s %s""" % (self.name, socket_cmd)
-        subprocess.check_output(socket_cmd_screen, shell=True)
-        sleep(4)
-
     def get_pid(self):
         try:
             pid = subprocess.check_output('ps auxww | grep -v grep | grep "bhyve: %s" | awk \'{print $2}\'' % self.name, shell=True)
@@ -163,6 +154,15 @@ class VM:
         except ValueError:
             return 0
 
+    def get_vnc_port(self):
+        try:
+            if self.status() != 'Running':
+                raise ValueError('VM is not running, no vnc port available')
+            else:
+                port = subprocess.check_output("sockstat | grep %i | grep '\*:\*' | awk '{print $6}' | cut -d \: -f2" % self.get_pid(), shell=True)
+                return int(port)
+        except ValueError:
+            return 0
 
     def block_until_poweroff(self, timeout):
         i = 0
