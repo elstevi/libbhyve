@@ -13,9 +13,9 @@ DISK_TYPES = {
         'description': 'Low latency virtio disk driver',
     },
     'ahci-hd': {
-        'name': 'acpi-hd',
-        'short': 'acpihd',
-        'description': 'Acpi interface disk driver',
+        'name': 'ahci-hd',
+        'short': 'ahcihd',
+        'description': 'Ahci interface disk driver',
     },
 }
 NIC_TYPES = {
