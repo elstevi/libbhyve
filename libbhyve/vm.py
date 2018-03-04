@@ -28,6 +28,8 @@ class VM:
             self.load_from_file('%s' % (something))
         elif something == None:
             b = '' 
+        elif isinstance(something, dict):
+            self.load_from_dict(something)
         else:
             raise OSError("VM %s does not exist" % something)
 
