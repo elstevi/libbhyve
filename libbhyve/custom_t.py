@@ -30,3 +30,15 @@ NIC_TYPES = {
         'description': 'Intel e1000 virtual network driver',
     },
 }
+BACKING_TYPES = {
+    'zvol': {
+        'name': 'zvol',
+        'short': 'zvol',
+        'description': 'zfs volume',
+    },
+    'file': {
+        'name': 'file',
+        'short': 'file',
+        'description': 'file',
+    },
+}

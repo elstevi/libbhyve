@@ -78,8 +78,11 @@ class VM:
                 for v in value:
                     self.disk.append(
                         Disk(
-                            v['path'],
-                            v['driver'],
+                            path=v.get('path'),
+                            driver=v.get('driver'),
+                            create_disk=v.get('create_disk'),
+                            backing=v.get('backing'),
+                            size=v.get('size'),
                         )
                     )
             else:
@@ -113,6 +116,11 @@ class VM:
         os.remove(FILE)
         nginx_reload()
 
+    def create(self):
+        for disk in self.disk:
+            disk.create()
+        for network in self.network:
+            network.create()
 
     def save(self):
         d = self.dump_to_dict()
@@ -227,5 +235,9 @@ class VM:
     def delete(self):
         if self.status() == 'Running':
             self.stop()
+        for disk in self.disk:
+            disk.delete()
+        for network in self.network:
+            network.delete()
         os.remove('%s/%s' % (VM_DIR, self.name))
 

@@ -28,6 +28,12 @@ class Nic():
         self.driver = driver
         self.tap = 'none'
 
+    def create(self):
+        print("Network create waves hello and does nothing")
+
+    def delete(self):
+        print("Network delete waves hello and does nothing")
+
     def dump(self):
         rtrn = {}
         for v in vars(self):

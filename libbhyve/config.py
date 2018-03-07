@@ -1,1 +1,1 @@
-VM_DIR='/usr/local/etc/vm.d'
+VM_DIR='/persist/vms/'
