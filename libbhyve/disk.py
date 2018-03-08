@@ -24,7 +24,7 @@ class Disk():
 
             elif self.backing == "file":
                 subprocess.check_output("truncate -s %s %s" % (self.size, self.path), shell=True)
-            self.path = '/dev/zvol/%s' % self.path
+            self.path = '%s' % self.path
 
     def delete(self):
         if self.create_disk == "yes":
