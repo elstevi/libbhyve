@@ -64,6 +64,8 @@ class VM:
         self.load_from_dict(fconf)
 
     def load_from_dict(self, d):
+        self.disk = []
+        self.network = []
         for key, value in d.iteritems():
             if key == 'network':
                 for v in value:
@@ -95,8 +97,12 @@ class VM:
                 rtrn[key] = []
                 rtrn['vnc_port'] = self.get_vnc_port()
                 for item in vars(self)[key]:
-                    rtrn[key].append(item.dump())
-                    print 'dump %s' % item 
+                    try:
+                        rtrn[key].append(item.dump())
+                        print 'dump %s' % item
+                    except Exception as e:
+                        with open('/tmp/libbhyve.log', 'w+') as f:
+                            f.write('%s %s %s' % (e, type(item), item))
             else:
                 rtrn[key] = getattr(self, key)
         return rtrn

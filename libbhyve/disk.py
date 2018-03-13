@@ -1,6 +1,6 @@
 import subprocess
 from custom_t import DISK_TYPES
-from os.path import isfile
+from os.path import exists, isfile
 from os import remove, stat
 
 class Disk():
@@ -19,10 +19,10 @@ class Disk():
         self.size = size
     def create(self):
         if self.create_disk == "yes":
-            if self.backing == "zvol":
+            if self.backing == "zvol" and not exists('/dev/zvol/%s' % self.path):
                 subprocess.check_output("zfs create -V %s %s" % (self.size, self.path), shell=True)
 
-            elif self.backing == "file":
+            elif self.backing == "file" and not exists(self.path):
                 subprocess.check_output("truncate -s %s %s" % (self.size, self.path), shell=True)
             self.path = '%s' % self.path
 
