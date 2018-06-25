@@ -20,7 +20,7 @@ class Disk():
     def create(self):
         if self.create_disk == "yes":
             if self.backing == "zvol" and not exists('/dev/zvol/%s' % self.path):
-                subprocess.check_output("zfs create -V %s %s" % (self.size, self.path), shell=True)
+                subprocess.check_output("zfs create -p -V %s %s" % (self.size, self.path), shell=True)
 
             elif self.backing == "file" and not exists(self.path):
                 subprocess.check_output("truncate -s %s %s" % (self.size, self.path), shell=True)
