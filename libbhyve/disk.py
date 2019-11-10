@@ -1,10 +1,10 @@
 import subprocess
-from custom_t import DISK_TYPES
+from libbhyve.custom_t import DISK_TYPES
 from os.path import exists, isfile
 from os import remove, stat
 
 class Disk():
-    def __init__(self, path=None, driver=None, create_disk=False, backing="zvol", size=False):
+    def __init__(self, path=None, driver='ahci-hd', create_disk=False, backing="zvol", size='10G'):
         if driver not in DISK_TYPES:
             raise TypeError('Invalid driver %s' % driver)
 #        if not isfile(path):

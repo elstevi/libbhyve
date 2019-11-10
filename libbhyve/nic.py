@@ -1,10 +1,10 @@
-from custom_t import NIC_TYPES
+from libbhyve.custom_t import NIC_TYPES
 from re import match
 from subprocess import check_output
-from utils import shell
+from libbhyve.utils import bridge_exists, shell
 
 class Nic():
-    def __init__(self, bridge, driver, mac='auto'):
+    def __init__(self, bridge='bridge0', driver='e1000', mac='auto'):
         # Validate that the driver is valid
         if driver not in NIC_TYPES:
             raise TypeError('Invalid driver %s' % driver)
@@ -12,15 +12,13 @@ class Nic():
         # Make sure that the mac address is valid
         if type(mac) is not str:
             raise TypeError('Mac should be a string but was %s %s' % (type(mac), mac))
+
         if not match("[0-9a-f]{2}([-:])[0-9a-f]{2}(\\1[0-9a-f]{2}){4}$", mac.lower()) and not mac == 'auto':
             raise TypeError('Invalid mac addr %s' % mac)
 
         # Make sure that the bridge is valid
-#        if type(bridge) is not str:
-#            raise TypeError('Bridge should be a string')
-
-        if not bridge in check_output("ifconfig -g bridge", shell=True):
-            raise TypeError('Bridge %s does not exist' % bridge)
+        if not bridge_exists(bridge):
+            raise TypeError('bridge does not exist')
 
         # Set all internal object variables
         self.mac    = mac.lower()
@@ -46,7 +44,7 @@ class Nic():
         else:
             mac_str = ""
 
-        self.tap = check_output("ifconfig tap create | tr -d '\n'", shell=True)
+        self.tap = check_output("ifconfig tap create | tr -d '\n'", shell=True).decode('utf-8')
         shell('ifconfig %s addm %s' % (self.bridge, self.tap))
         return '-s %s,%s,%s%s ' % (i, self.driver, self.tap, mac_str)
 

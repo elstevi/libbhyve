@@ -1,44 +1,62 @@
-from config import *
-from disk import Disk
+from libbhyve.config import *
+from libbhyve.disk import Disk
 from jinja2 import Environment, PackageLoader
-from nic import Nic
+from libbhyve.nic import Nic
 from os.path import isfile
 from time import sleep
-from utils import log, shell, nginx_reload
+from libbhyve.utils import log, shell
 import subprocess
-import json 
+import json
 import os
+import uuid
 
 class VM:
-    def __init__(self, something):
+    """ This function initializes a virtual machine object.
+
+    Passing no arguments returns a blank virtual machine template. From there, you can just alter the class attributes of the class
+
+    args:
+        infile (str, opt): contains the path of a virtual machine json file to load
+        indict (str, opt): contains a dictionary of values to load from
+    """
+    def __init__(self, infile=None, indict={}):
         self.auto_start = False
         self.bootrom = '/usr/local/share/uefi-firmware/BHYVE_UEFI.fd'
-        self.com1 = 'stdio'
+        # Possible options: stdio, nmdm_auto
+        self.com1 = 'nmdm_auto'
+        self.com2 = None
         self.disk = []
-        self.fbuf_wait = False 
-        self.iso = "" 
-        self.memory = 1024 
+        self.fbuf_wait = False
+        self.iso = None
+        self.memory = 256
         self.name = ''
         self.ncpus = 1
         self.network = []
+        self.uuid = None
 
-        if isfile('%s/%s' % (VM_DIR, something)):
-            self.load_from_file('%s/%s' % (VM_DIR, something))
-        elif isfile('%s' % (something)):
-            self.load_from_file('%s' % (something))
-        elif something == None:
-            b = '' 
-        elif isinstance(something, dict):
-            self.load_from_dict(something)
-        else:
-            raise OSError("VM %s does not exist" % something)
+        if infile:
+            if not isfile(infile):
+                raise TypeError('infile is not a file')
+            else:
+                self.load_from_file('%s' % (infile))
+        elif indict:
+            if not isinstance(indict, dict):
+                raise TypeError('indict is not a dict!')
+            else:
+                self.load_from_dict(something)
 
-        # Make sure values are reasonable
-
-#        self.associate_taps()
-
+        if self.uuid == None:
+            self.uuid = str(uuid.uuid4())
 
     def is_tap_bridge_member(self, tap, bridge):
+        """ Determine if a bridge and tap are joined
+            args:
+                tap (str): name of tap device
+                bridge (str): name of bridge device
+
+            returns:
+                true or false
+        """
         cmd = "ifconfig %s | grep ': %s ' || true" % (bridge, tap)
         output = subprocess.check_output(cmd, shell=True)
         if output != None and output.count('\n') == 1:
@@ -46,27 +64,28 @@ class VM:
         else:
             return False
 
-#    def get_taps_in_use(self):
-#        cmd = "ifconfig | grep -B 7 'Opened by PID %s' | grep 'tap[0-9]*:' | cut -d \: -f1" % self.get_pid()
-#        taps = subprocess.check_output(cmd, shell=True).splitlines()
-#        return taps
-
-#    def associate_taps(self):
-#        taps = self.get_taps_in_use()
-#        for interface in self.network:
-#            for tap in taps:
-#                if self.is_tap_bridge_member(tap, interface.bridge):
-#                    interface.tap = tap
 
     def load_from_file(self, fpath):
+        """ Convenience function to open json configuration file
+
+            args:
+                fpath (str): path to vm configuration file.
+        """
         with open(fpath) as f:
             fconf = json.loads(f.read())
         self.load_from_dict(fconf)
 
+
     def load_from_dict(self, d):
+        """ Deserialize VM object from dict
+
+        args:
+            d (dict): target dictionary to deserialize
+        """
+
         self.disk = []
         self.network = []
-        for key, value in d.iteritems():
+        for key, value in d.items():
             if key == 'network':
                 for v in value:
                     self.network.append(
@@ -88,9 +107,20 @@ class VM:
                         )
                     )
             else:
-                exec("self.%s = '%s'" % (key, value))
-    
+                setattr(self, key, value)
+
+
+    def dump_to_file(self, path):
+        with open(path, 'w+') as f:
+            json.dump(self.dump_to_dict(), f)
+
+
     def dump_to_dict(self):
+        """ Deserialize object to dictionary:
+
+            returns:
+                serialized dictionary
+        """
         rtrn = {}
         for key in vars(self):
             if key == 'disk' or key == 'network':
@@ -99,7 +129,7 @@ class VM:
                 for item in vars(self)[key]:
                     try:
                         rtrn[key].append(item.dump())
-                        print 'dump %s' % item
+                        print('dump %s' % item)
                     except Exception as e:
                         with open('/tmp/libbhyve.log', 'w+') as f:
                             f.write('%s %s %s' % (e, type(item), item))
@@ -107,40 +137,25 @@ class VM:
                 rtrn[key] = getattr(self, key)
         return rtrn
 
-    def insert_websockify_config(self):
-        sleep(4) # Allow the socket to establish and pick a port
-        FILE="/usr/local/etc/nginx/sockify.d/%s" % self.name
-        env = Environment(loader=PackageLoader  ('libbhyve', 'templates'))
-        template = env.get_template('nginx-sockify.conf')
-        file_data = template.render(name=self.name, vnc_port=self.get_vnc_port())
-        with open(FILE,"wb") as f:
-            f.write(file_data)
-        nginx_reload()
-
-    def remove_websockify_config(self):
-        FILE="/usr/local/etc/nginx/sockify.d/%s" % self.name
-        os.remove(FILE)
-        nginx_reload()
-
     def create(self):
+        """ Trigger the create hook in the subclasses
+        """
         for disk in self.disk:
             disk.create()
         for network in self.network:
             network.create()
 
-    def save(self):
-        d = self.dump_to_dict()
-        with open('%s/%s' %(VM_DIR, self.name), 'w') as f:
-            f.write(json.dumps(d))
-        return True
-
     def __repr__(self):
-        ret = "< VM: %s >" % self.name
+        ret = "< VM: %s" % self.name
         for v in vars(self):
             ret += "  <%s: %s>" % (v, vars(self)[v])
+            ret += ">"
         return ret
 
     def start(self):
+        """ Start the virtual machine object on this hypervisor
+        """
+        # todo: this function should be cleaned up, maybe? Should the arguments be added to a list?
         pcistr = ''
         lpcistr = ''
         # Start with 1, because the hostbridge is 0
@@ -156,6 +171,7 @@ class VM:
             pcistr += ' %s' % disk.start(i)
             i = i + 1
 
+
         if len(self.iso) != 0:
             pcistr += '-s %s,ahci-cd,%s' % (i, self.iso)
             i = i + 1
@@ -164,22 +180,42 @@ class VM:
             fbw = ',wait'
         else:
             fbw = ''
-        pcistr += ' -s %s,fbuf,tcp=127.0.0.1:0%s' % (i, fbw)
+        pcistr += ' -s %s,fbuf,tcp=127.0.0.1:5900%s' % (i, fbw)
         i = i + 1
 
         # PCI Bridge devices
-        if self.com1 is not 'None':
-            lpcistr += '-l %s,%s ' % ('com1', self.com1)
+        for port in ['com1', 'com2']:
+            value = getattr(self, port)
+            if value is not None:
+                lpcistr += '-l %s,%s ' % (port, self.render_com_device(value))
 
         if self.bootrom is not None:
             lpcistr += '-l bootrom,%s' % self.bootrom
 
-        bhyve_cmd = """/usr/sbin/bhyve -c %s -m %sM -A -H -w -s 0,hostbridge -s 31,lpc %s %s %s""" % (self.ncpus, self.memory, pcistr, lpcistr, self.name)
-        screen_cmd = """/usr/local/bin/screen -dmS bhyve.%s sh -c '%s 2>&1 | tee /tmp/vm-%s'""" % (self.name, bhyve_cmd, self.name)
-        p = subprocess.Popen(screen_cmd, shell=True)
-        self.insert_websockify_config()
+        bhyve_cmd = "/usr/sbin/bhyve -c {ncpus} -m {memory}M -A -H -w -s 0,hostbridge -s 31,lpc {pcistr} {lpcistr} {name} >> /tmp/vm_{name} 2>&1".format(
+            pcistr=pcistr,
+            lpcistr=lpcistr,
+            **self.__dict__
+        )
+        p = subprocess.Popen(bhyve_cmd, shell=True)
+        #self.insert_websockify_config()
+
+    def render_com_device(self, device):
+        if device == 'stdio':
+            return device
+        elif 'nmdm' in device:
+            return '/dev/nmdm_{}_A'.format(self.name)
+        else:
+            assert TypeError('Unvalid value for com port {}'.format(device))
 
     def get_pid(self):
+        """ Get the pid of this virtual machine on this hypervisor
+
+            returns:
+                int(pid)
+                or
+                0 if not running
+        """
         try:
             pid = subprocess.check_output('ps auxww | grep -v grep | grep "bhyve: %s" | awk \'{print $2}\'' % self.name, shell=True)
             return int(pid)
@@ -187,7 +223,18 @@ class VM:
             return 0
 
     def get_vnc_port(self):
+        """ I have a patch to bhyve that allows a virtual machine to chose a random port by passing 0 to the socket command. This then checks what port
+        it got based on the process table.
+
+        returns:
+            int(port)
+            or
+            0 if not found
+        """
+        # todo: this should return None if it cannot be determined, not 0
+
         try:
+            # todo: this should use the enum
             if self.status() != 'Running':
                 raise ValueError('VM is not running, no vnc port available')
             else:
@@ -197,6 +244,13 @@ class VM:
             return 0
 
     def block_until_poweroff(self, timeout):
+        """ Hold execution captive until vm powers off or timeout is met.
+
+        args:
+            timeout(int): how long to wait until we give up
+        """
+        # todo: timeout should be optional and we should block forever
+
         i = 0
         while i < timeout:
             if self.get_pid() != 0:
@@ -207,9 +261,11 @@ class VM:
         return False
 
     def stop(self):
-        # xxx fixme just for testing
+        """ Stop a virtual machine """
+        # todo: low timeout is just for testing
         #TIMEOUT = 120
         TIMEOUT = 12
+        # todo: perhaps the os module has a way we can do this without shelling out
         subprocess.call('kill %s' % self.get_pid(), shell=True)
         log('info', 'Signaling vm %s to shut down' % self.name)
         if not self.block_until_poweroff(TIMEOUT):
@@ -225,20 +281,29 @@ class VM:
             network.stop()
         for disk in self.disk:
             disk.stop()
-        self.remove_websockify_config()
+        #self.remove_websockify_config()
 
     def status(self):
+        """ Get the status of a virtual machine
+
+            returns:
+                'Stopped' or 'Running'
+        """
+
+        # todo should this return an enum?
         if self.get_pid() == 0:
             return 'Stopped'
         else:
             return 'Running'
 
     def restart(self):
+        """ Stop VM if running, start it back up """
         if self.status() == 'Running':
             self.stop()
         self.start()
 
     def delete(self):
+        """ Stops and deletes virtual machine configuration, disk, network. """
         if self.status() == 'Running':
             self.stop()
         for disk in self.disk:
